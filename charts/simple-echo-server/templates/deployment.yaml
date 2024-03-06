@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "echo-server.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+{{ include "echo-server.labels" . | indent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "echo-server.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      labels:
+        app.kubernetes.io/name: {{ include "echo-server.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ template "echo-server.fullname" . }}
+          livenessProbe:
+            httpGet:
+                path: {{ .Values.livenessProbe.httpGet.path }}
+                {{- if .Values.livenessProbe.httpGet.httpHeaders }}
+                httpHeaders:
+{{ toYaml .Values.livenessProbe.httpGet.httpHeaders | indent 16 }}
+                {{- end }}
+                port: http
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+            successThreshold: {{ .Values.livenessProbe.successThreshold }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
